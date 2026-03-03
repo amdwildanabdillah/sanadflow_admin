@@ -16,8 +16,9 @@ import {
   ImageIcon,
   Plus,
 } from 'lucide-vue-next'
-// Import SweetAlert Custom
+// Import SweetAlert & Logger
 import { showSuccess, showError, confirmAction } from '../utils/alert'
+import { logActivity } from '../utils/logger'
 
 const kajians = ref([])
 const daisList = ref([]) // Menyimpan list nama Da'i untuk dropdown
@@ -75,7 +76,6 @@ const fetchStats = async () => {
       supabase.from('dais').select('*', { count: 'exact', head: true }),
       supabase.from('profiles').select('*', { count: 'exact', head: true }),
     ])
-
     stats.value = {
       totalKajian: resKajians.count || 0,
       pendingKajian: resPending.count || 0,
@@ -96,7 +96,6 @@ const fetchKajians = async () => {
       .from('kajian_lengkap')
       .select('*')
       .order('created_at', { ascending: false })
-
     if (error) throw error
     kajians.value = data || []
   } catch (error) {
@@ -116,7 +115,6 @@ const filteredKajians = computed(() => {
 const updateStatus = async (id, newStatus, title) => {
   const action = newStatus === 'approved' ? 'MENYETUJUI' : 'MENOLAK'
 
-  // Menggunakan SweetAlert Confirm
   const isConfirmed = await confirmAction(
     `${action} Kajian?`,
     `Yakin ingin ${action.toLowerCase()} kajian:\n"${title}"?`,
@@ -127,6 +125,14 @@ const updateStatus = async (id, newStatus, title) => {
   try {
     const { error } = await supabase.from('kajians').update({ status: newStatus }).eq('id', id)
     if (error) throw error
+
+    // LOGGER
+    await logActivity(
+      'Kajian',
+      'Update',
+      `Mengubah status kajian "${title}" menjadi ${newStatus.toUpperCase()}`,
+    )
+
     fetchKajians()
     fetchStats()
     showSuccess('Berhasil', `Kajian berhasil di-${newStatus}.`)
@@ -164,9 +170,7 @@ const openModal = (kajian = null) => {
   document.getElementById('modal_kajian').showModal()
 }
 
-const closeModal = () => {
-  document.getElementById('modal_kajian').close()
-}
+const closeModal = () => document.getElementById('modal_kajian').close()
 
 const saveKajian = async () => {
   isSaving.value = true
@@ -182,17 +186,17 @@ const saveKajian = async () => {
     }
 
     if (isEditMode.value) {
-      // Update
       const { error } = await supabase
         .from('kajians')
         .update(payload)
         .eq('id', editFormData.value.id)
       if (error) throw error
+      await logActivity('Kajian', 'Update', `Memperbarui data kajian: "${payload.title}"`) // LOGGER
       showSuccess('Tersimpan!', 'Perubahan kajian berhasil disimpan.')
     } else {
-      // Insert Baru
       const { error } = await supabase.from('kajians').insert([payload])
       if (error) throw error
+      await logActivity('Kajian', 'Create', `Menambahkan kajian baru: "${payload.title}"`) // LOGGER
       showSuccess('Berhasil!', 'Kajian baru telah ditambahkan.')
     }
 
@@ -217,6 +221,10 @@ const deleteKajian = async (id, title) => {
   try {
     const { error } = await supabase.from('kajians').delete().eq('id', id)
     if (error) throw error
+
+    // LOGGER
+    await logActivity('Kajian', 'Delete', `Menghapus permanen kajian: "${title}"`)
+
     fetchKajians()
     fetchStats()
     showSuccess('Terhapus', 'Kajian telah dihapus dari database.')
@@ -227,14 +235,17 @@ const deleteKajian = async (id, title) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
-  const options = { year: 'numeric', month: 'short', day: 'numeric' }
-  return new Date(dateString).toLocaleDateString('id-ID', options)
+  return new Date(dateString).toLocaleDateString('id-ID', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 onMounted(() => {
   fetchStats()
   fetchKajians()
-  fetchDaisList() // Tarik list Da'i buat dropdown
+  fetchDaisList()
 })
 </script>
 
@@ -252,8 +263,8 @@ onMounted(() => {
             <span
               v-if="isStatsLoading"
               class="loading loading-spinner loading-md text-warning"
-            ></span>
-            <span v-else>{{ stats.pendingKajian }}</span>
+            ></span
+            ><span v-else>{{ stats.pendingKajian }}</span>
           </h4>
         </div>
       </div>
@@ -268,8 +279,8 @@ onMounted(() => {
             <span
               v-if="isStatsLoading"
               class="loading loading-spinner loading-md text-[#2962FF]"
-            ></span>
-            <span v-else>{{ stats.totalKajian }}</span>
+            ></span
+            ><span v-else>{{ stats.totalKajian }}</span>
           </h4>
         </div>
       </div>
@@ -283,8 +294,8 @@ onMounted(() => {
             <span
               v-if="isStatsLoading"
               class="loading loading-spinner loading-md text-success"
-            ></span>
-            <span v-else>{{ stats.totalDai }}</span>
+            ></span
+            ><span v-else>{{ stats.totalDai }}</span>
           </h4>
         </div>
       </div>
@@ -298,8 +309,8 @@ onMounted(() => {
             <span
               v-if="isStatsLoading"
               class="loading loading-spinner loading-md text-amber-500"
-            ></span>
-            <span v-else>{{ stats.totalUsers }}</span>
+            ></span
+            ><span v-else>{{ stats.totalUsers }}</span>
           </h4>
         </div>
       </div>
@@ -374,7 +385,6 @@ onMounted(() => {
     <div v-if="isLoading" class="flex justify-center p-20">
       <span class="loading loading-bars loading-lg text-[#2962FF]"></span>
     </div>
-
     <div
       v-else-if="filteredKajians.length > 0"
       class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
@@ -394,8 +404,7 @@ onMounted(() => {
             v-else
             class="w-full h-full flex flex-col items-center justify-center text-gray-600 bg-[#121212]"
           >
-            <Tv class="w-8 h-8 mb-2 opacity-50" />
-            <span class="text-xs">No Image</span>
+            <Tv class="w-8 h-8 mb-2 opacity-50" /><span class="text-xs">No Image</span>
           </div>
           <div class="absolute top-3 left-3">
             <div
@@ -426,11 +435,9 @@ onMounted(() => {
             :href="kajian.video_url"
             target="_blank"
             class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm z-10 cursor-pointer"
-          >
-            <div class="bg-[#2962FF] p-3 rounded-full text-white shadow-lg shadow-blue-500/50">
-              <PlayCircle class="w-6 h-6" />
-            </div>
-          </a>
+            ><div class="bg-[#2962FF] p-3 rounded-full text-white shadow-lg shadow-blue-500/50">
+              <PlayCircle class="w-6 h-6" /></div
+          ></a>
         </div>
 
         <div class="p-4 flex-1 flex flex-col">
@@ -454,8 +461,8 @@ onMounted(() => {
           <div
             class="text-[10px] text-gray-500 flex justify-between items-center border-t border-white/5 pt-3"
           >
-            <span>Diupload: {{ formatDate(kajian.created_at) }}</span>
-            <a
+            <span>Diupload: {{ formatDate(kajian.created_at) }}</span
+            ><a
               :href="kajian.video_url"
               target="_blank"
               class="hover:text-[#2962FF] flex items-center gap-1"
@@ -557,8 +564,9 @@ onMounted(() => {
               v-else
               class="absolute inset-0 flex flex-col items-center justify-center text-gray-600 bg-[#1A1A1A]"
             >
-              <Tv class="w-8 h-8 mb-2 opacity-50" />
-              <span class="text-sm font-medium">Gambar Tidak Valid</span>
+              <Tv class="w-8 h-8 mb-2 opacity-50" /><span class="text-sm font-medium"
+                >Gambar Tidak Valid</span
+              >
             </div>
             <div
               class="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-white uppercase border border-white/10"
@@ -569,8 +577,8 @@ onMounted(() => {
 
           <div class="flex flex-col gap-5">
             <div class="flex flex-col gap-2">
-              <label class="text-sm font-bold text-gray-300">Judul Kajian</label>
-              <input
+              <label class="text-sm font-bold text-gray-300">Judul Kajian</label
+              ><input
                 v-model="editFormData.title"
                 type="text"
                 class="input input-bordered bg-[#121212] border-white/10 text-white w-full focus:border-[#2962FF] focus:outline-none"
@@ -593,7 +601,6 @@ onMounted(() => {
                   </option>
                 </select>
               </div>
-
               <div class="flex flex-col gap-2">
                 <label class="text-sm font-bold text-gray-300">Kategori Topik</label>
                 <select
@@ -613,18 +620,17 @@ onMounted(() => {
             </div>
 
             <div class="flex flex-col gap-2">
-              <label class="text-sm font-bold text-gray-300">URL Thumbnail Gambar</label>
-              <input
+              <label class="text-sm font-bold text-gray-300">URL Thumbnail Gambar</label
+              ><input
                 v-model="editFormData.thumbnail_url"
                 type="url"
                 class="input input-bordered bg-[#121212] border-white/10 text-gray-400 w-full focus:border-[#2962FF] focus:outline-none focus:text-white"
                 placeholder="https://..."
               />
             </div>
-
             <div class="flex flex-col gap-2">
-              <label class="text-sm font-bold text-gray-300">URL Video Sumber (YouTube dll)</label>
-              <input
+              <label class="text-sm font-bold text-gray-300">URL Video Sumber (YouTube dll)</label
+              ><input
                 v-model="editFormData.video_url"
                 type="url"
                 class="input input-bordered bg-[#121212] border-white/10 text-gray-400 w-full focus:border-[#2962FF] focus:outline-none focus:text-white"
@@ -646,15 +652,14 @@ onMounted(() => {
             </div>
 
             <div class="flex flex-col gap-2">
-              <label class="text-sm font-bold text-gray-300">Deskripsi Lengkap</label>
-              <textarea
+              <label class="text-sm font-bold text-gray-300">Deskripsi Lengkap</label
+              ><textarea
                 v-model="editFormData.description"
                 class="textarea textarea-bordered bg-[#121212] border-white/10 text-white w-full focus:border-[#2962FF] focus:outline-none min-h-[150px]"
-                placeholder="Tulis catatan, rangkuman, atau sumber kitab..."
+                placeholder="Tulis catatan, rangkuman..."
               ></textarea>
             </div>
           </div>
-
           <button type="submit" class="hidden"></button>
         </form>
 
@@ -674,14 +679,12 @@ onMounted(() => {
             class="btn bg-[#2962FF] hover:bg-blue-700 text-white border-0 px-8 shadow-lg shadow-blue-500/20"
             :disabled="isSaving"
           >
-            <span v-if="isSaving" class="loading loading-spinner loading-sm"></span>
-            {{ isSaving ? 'Menyimpan...' : isEditMode ? 'Simpan Perubahan' : 'Tambah Kajian' }}
+            <span v-if="isSaving" class="loading loading-spinner loading-sm"></span
+            >{{ isSaving ? 'Menyimpan...' : isEditMode ? 'Simpan Perubahan' : 'Tambah Kajian' }}
           </button>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-      </form>
+      <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
   </div>
 </template>

@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { supabase } from './supabase'
-import { Tv, Info, LogOut, ShieldCheck, Users, UserCog } from 'lucide-vue-next'
+import { Tv, Info, LogOut, Activity, ShieldCheck, Users, UserCog } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -104,6 +104,15 @@ const handleLogout = async () => {
           <UserCog class="w-5 h-5 mr-2" /> Kelola User
         </RouterLink>
 
+        <router-link
+          to="/activity"
+          class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-[#2962FF]/10 hover:text-[#2962FF] transition-colors"
+          active-class="bg-[#2962FF] text-white hover:bg-[#2962FF] hover:text-white shadow-lg shadow-blue-500/20 font-bold"
+        >
+          <Activity class="w-5 h-5" />
+          Log Aktivitas
+        </router-link>
+
         <RouterLink
           to="/about"
           class="btn btn-ghost justify-start text-gray-400 hover:text-white hover:bg-[#1E1E1E] mt-auto"
@@ -114,7 +123,7 @@ const handleLogout = async () => {
     </aside>
 
     <main class="flex-1 flex flex-col overflow-y-auto bg-[#1A1A1A]">
-      <header class="navbar bg-[#121212] border-b border-white/5 px-8">
+      <header class="navbar bg-[#121212] border-b border-white/5 px-8 sticky top-0 z-50">
         <div class="flex-1">
           <div class="flex items-center gap-2">
             <ShieldCheck class="w-6 h-6 text-[#2962FF]" />

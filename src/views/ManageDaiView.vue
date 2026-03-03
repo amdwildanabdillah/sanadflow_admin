@@ -17,7 +17,9 @@ import {
   Building2,
   Image as ImageIcon,
 } from 'lucide-vue-next'
+// Import SweetAlert & Logger
 import { showSuccess, showError, confirmAction } from '../utils/alert'
+import { logActivity } from '../utils/logger'
 
 const dais = ref([])
 const isLoading = ref(true)
@@ -26,7 +28,6 @@ const isSaving = ref(false)
 const isFetchingDetail = ref(false)
 
 const isEditMode = ref(false)
-
 const formData = ref({
   id: null,
   name: '',
@@ -165,6 +166,9 @@ const saveDai = async () => {
       if (errUpdate) throw errUpdate
       await supabase.from('dai_fanbases').delete().eq('dai_id', targetDaiId)
       await supabase.from('dai_sanads').delete().eq('dai_id', targetDaiId)
+
+      // LOGGER
+      await logActivity("Da'i", 'Update', `Memperbarui profil Ustadz/Da'i: "${daiPayload.name}"`)
     } else {
       const { data, error: errInsert } = await supabase
         .from('dais')
@@ -173,6 +177,9 @@ const saveDai = async () => {
         .single()
       if (errInsert) throw errInsert
       targetDaiId = data.id
+
+      // LOGGER
+      await logActivity("Da'i", 'Create', `Menambahkan Ustadz/Da'i baru: "${daiPayload.name}"`)
     }
 
     const validFanbases = fanbaseForms.value
@@ -223,6 +230,14 @@ const deleteDai = async (id, name) => {
   try {
     const { error } = await supabase.from('dais').delete().eq('id', id)
     if (error) throw error
+
+    // LOGGER
+    await logActivity(
+      "Da'i",
+      'Delete',
+      `Menghapus Ustadz/Da'i: "${name}" beserta seluruh relasinya`,
+    )
+
     fetchDais()
     showSuccess('Terhapus!', 'Penceramah berhasil dihapus.')
   } catch (err) {
@@ -242,6 +257,14 @@ const toggleVerification = async (id, currentStatus, name) => {
   try {
     const { error } = await supabase.from('dais').update({ is_verified: newStatus }).eq('id', id)
     if (error) throw error
+
+    // LOGGER
+    await logActivity(
+      "Da'i",
+      'Update',
+      `${actionWord.toUpperCase()} lencana verifikasi untuk Da'i: "${name}"`,
+    )
+
     fetchDais()
     showSuccess(
       'Verifikasi Diupdate',

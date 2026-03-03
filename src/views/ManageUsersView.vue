@@ -13,7 +13,9 @@ import {
   ShieldAlert,
   Filter,
 } from 'lucide-vue-next'
+// Import SweetAlert & Logger
 import { showSuccess, showError, confirmAction } from '../utils/alert'
+import { logActivity } from '../utils/logger'
 
 const usersList = ref([])
 const isLoading = ref(true)
@@ -102,6 +104,14 @@ const saveUser = async () => {
       .update({ role: formData.value.role, full_name: formData.value.full_name })
       .eq('id', formData.value.id)
     if (error) throw error
+
+    // LOGGER
+    await logActivity(
+      'Pengguna',
+      'Update',
+      `Mengubah hak akses user "${formData.value.full_name}" menjadi ${formData.value.role.toUpperCase()}`,
+    )
+
     closeModal()
     fetchUsers()
     showSuccess('Akses Diperbarui', `Role berhasil diubah menjadi ${formData.value.role}.`)
@@ -122,6 +132,10 @@ const deleteUser = async (id, name) => {
   try {
     const { error } = await supabase.from('profiles').delete().eq('id', id)
     if (error) throw error
+
+    // LOGGER
+    await logActivity('Pengguna', 'Delete', `Menghapus profil pengguna: "${name}" dari sistem`)
+
     fetchUsers()
     showSuccess('Terhapus!', 'Profil pengguna berhasil dihapus.')
   } catch (err) {
