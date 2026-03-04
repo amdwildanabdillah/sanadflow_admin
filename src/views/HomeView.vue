@@ -30,6 +30,16 @@ const isStatsLoading = ref(true)
 const isSaving = ref(false)
 const isUploading = ref(false)
 
+const categoriesList = ref([
+  'Umum',
+  'Fiqih',
+  'Aqidah',
+  'Sejarah',
+  'Muamalah',
+  'Tazkiyatun Nafs',
+  'Parenting',
+])
+const isCustomCategory = ref(false)
 const filterStatus = ref('all')
 
 const stats = ref({
@@ -156,12 +166,20 @@ const updateStatus = async (id, newStatus, title) => {
 }
 
 const openModal = (kajian = null) => {
+  isCustomCategory.value = false
   if (kajian) {
     isEditMode.value = true
+
+    // Pastikan kategori ada di list, jika tidak (custom), tambahkan sementara
+    const currentCat = kajian.category || 'Umum'
+    if (!categoriesList.value.includes(currentCat)) {
+      categoriesList.value.push(currentCat)
+    }
+
     editFormData.value = {
       id: kajian.id,
       title: kajian.title || '',
-      category: kajian.category || 'Umum',
+      category: currentCat,
       description: kajian.description || '',
       video_url: kajian.video_url || '',
       thumbnail_url: kajian.thumbnail_url || '',
@@ -185,6 +203,13 @@ const openModal = (kajian = null) => {
 }
 
 const closeModal = () => document.getElementById('modal_kajian').close()
+
+const checkCategory = () => {
+  if (editFormData.value.category === '__NEW__') {
+    isCustomCategory.value = true
+    editFormData.value.category = ''
+  }
+}
 
 const handleFileUpload = async (event) => {
   const file = event.target.files[0]
@@ -645,19 +670,36 @@ onMounted(() => {
               </div>
               <div class="flex flex-col gap-2">
                 <label class="text-sm font-bold text-gray-300">Kategori Topik</label>
-                <select
-                  v-model="editFormData.category"
-                  class="select select-bordered bg-[#121212] border-white/10 text-white w-full focus:border-[#2962FF] focus:outline-none"
-                  required
-                >
-                  <option value="Umum">Umum</option>
-                  <option value="Fiqih">Fiqih</option>
-                  <option value="Aqidah">Aqidah</option>
-                  <option value="Sejarah">Sejarah</option>
-                  <option value="Muamalah">Muamalah</option>
-                  <option value="Tazkiyatun Nafs">Tazkiyatun Nafs</option>
-                  <option value="Parenting">Parenting</option>
-                </select>
+                <div v-if="!isCustomCategory">
+                  <select
+                    v-model="editFormData.category"
+                    class="select select-bordered bg-[#121212] border-white/10 text-white w-full focus:border-[#2962FF] focus:outline-none"
+                    required
+                    @change="checkCategory"
+                  >
+                    <option v-for="cat in categoriesList" :key="cat" :value="cat">{{ cat }}</option>
+                    <option value="__NEW__" class="font-bold text-[#2962FF] bg-[#1A1A1A]">
+                      + Tambah Kategori Baru...
+                    </option>
+                  </select>
+                </div>
+                <div v-else class="flex gap-2">
+                  <input
+                    v-model="editFormData.category"
+                    type="text"
+                    class="input input-bordered bg-[#121212] border-white/10 text-white w-full focus:border-[#2962FF] focus:outline-none"
+                    placeholder="Tulis nama kategori baru..."
+                    autofocus
+                  />
+                  <button
+                    type="button"
+                    @click="((isCustomCategory = false), (editFormData.category = 'Umum'))"
+                    class="btn btn-square btn-outline border-white/10 text-gray-400 hover:text-white"
+                    title="Batal"
+                  >
+                    <XCircle class="w-5 h-5" />
+                  </button>
+                </div>
               </div>
             </div>
 
