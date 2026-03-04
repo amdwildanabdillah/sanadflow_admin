@@ -16,6 +16,7 @@ import {
   PlusCircle,
   Building2,
   Image as ImageIcon,
+  Upload,
 } from 'lucide-vue-next'
 // Import SweetAlert & Logger
 import { showSuccess, showError, confirmAction } from '../utils/alert'
@@ -26,6 +27,7 @@ const isLoading = ref(true)
 const searchQuery = ref('')
 const isSaving = ref(false)
 const isFetchingDetail = ref(false)
+const isUploading = ref(false)
 
 const isEditMode = ref(false)
 const formData = ref({
@@ -122,6 +124,29 @@ const openModal = async (dai = null) => {
 }
 
 const closeModal = () => document.getElementById('modal_dai').close()
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  isUploading.value = true
+  try {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `dai-${Date.now()}.${fileExt}`
+    const filePath = `avatars/${fileName}`
+
+    const { error: uploadError } = await supabase.storage.from('images').upload(filePath, file)
+    if (uploadError) throw uploadError
+
+    const { data } = supabase.storage.from('images').getPublicUrl(filePath)
+    formData.value.avatar_url = data.publicUrl
+    showSuccess('Upload Berhasil', 'Foto profil berhasil diunggah')
+  } catch (error) {
+    showError('Gagal Upload', error.message)
+  } finally {
+    isUploading.value = false
+  }
+}
 
 const addFanbase = () =>
   fanbaseForms.value.push({ nama_akun: '', platform: 'instagram', url_akun: '' })
@@ -280,31 +305,29 @@ onMounted(fetchDais)
 
 <template>
   <div class="pb-24">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-5 mb-8">
-      <div>
-        <h2 class="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-          <Users class="w-8 h-8 text-[#2962FF]" /> Database Penceramah
-        </h2>
-        <p class="text-gray-400 text-sm">
-          Kelola profil, akun clipper (fanbase), dan jaringan sanad keilmuan.
-        </p>
-      </div>
-      <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-        <div class="relative flex-1 sm:w-64">
-          <Search class="w-4 h-4 absolute left-4 top-3.5 text-gray-500" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Cari nama Da'i..."
-            class="input bg-[#121212] border border-white/10 text-white w-full pl-11 focus:border-[#2962FF] focus:outline-none"
-          />
-        </div>
-        <button
-          @click="openModal()"
-          class="btn bg-[#2962FF] hover:bg-blue-700 text-white border-0 shadow-lg shadow-blue-500/20"
+    <div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
+      <div class="flex items-center gap-4 w-full md:w-auto">
+        <div
+          class="w-14 h-14 rounded-2xl bg-[#2962FF]/10 flex items-center justify-center text-[#2962FF] shrink-0"
         >
-          <Plus class="w-5 h-5" /> Tambah Da'i Baru
-        </button>
+          <Users class="w-7 h-7" />
+        </div>
+        <div>
+          <h2 class="text-2xl font-bold text-white">Database Penceramah</h2>
+          <p class="text-gray-400 text-sm">
+            Kelola profil, akun clipper (fanbase), dan jaringan sanad keilmuan.
+          </p>
+        </div>
+      </div>
+
+      <div class="relative w-full md:w-72">
+        <Search class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Cari nama Da'i..."
+          class="input bg-[#121212] border border-white/10 text-white w-full pl-11 focus:border-[#2962FF] focus:outline-none rounded-full h-12 shadow-inner"
+        />
       </div>
     </div>
 
@@ -422,244 +445,380 @@ onMounted(fetchDais)
           @submit.prevent="saveDai"
           class="flex flex-col h-full max-h-[75vh] overflow-y-auto p-6 md:p-8 gap-8"
         >
-          <div class="flex flex-col gap-5">
-            <h4
-              class="text-blue-400 font-bold flex items-center gap-2 border-b border-white/10 pb-2"
-            >
-              <Users class="w-4 h-4" /> 1. Profil Utama
-            </h4>
-            <div class="flex flex-col gap-2">
-              <label class="text-sm font-bold text-gray-300">Nama Lengkap / Gelar *</label
-              ><input
-                v-model="formData.name"
-                type="text"
-                class="input bg-[#121212] border-white/10 text-white focus:outline-none focus:border-[#2962FF]"
-                required
-              />
-            </div>
-            <div class="flex flex-col gap-2">
-              <label class="text-sm font-bold text-gray-300">Bio Singkat</label
-              ><textarea
-                v-model="formData.bio"
-                class="textarea bg-[#121212] border-white/10 text-white focus:outline-none focus:border-[#2962FF]"
-              ></textarea>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div class="flex flex-col gap-2">
-                <label class="text-sm font-bold text-gray-300">URL Foto Profil</label
-                ><input
-                  v-model="formData.avatar_url"
-                  type="url"
-                  class="input bg-[#121212] border-white/10 text-white focus:outline-none focus:border-[#2962FF]"
-                />
+          <!-- 1. Profil Utama -->
+          <div class="space-y-6">
+            <div class="flex items-center gap-3 pb-2 border-b border-white/5">
+              <div class="p-2 rounded-lg bg-blue-500/10 text-blue-500">
+                <Users class="w-5 h-5" />
               </div>
-              <div class="flex items-end mb-2">
-                <label
-                  class="cursor-pointer flex items-center gap-3 bg-[#1A1A1A] px-4 py-2.5 rounded-lg border border-white/10 hover:border-blue-500 transition-colors w-full"
+              <h4 class="text-lg font-bold text-white">Profil Utama</h4>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <!-- Left Column: Avatar -->
+              <div class="md:col-span-4 flex flex-col gap-4">
+                <label class="text-sm font-bold text-gray-400">Foto Profil</label>
+                <div
+                  class="relative group w-full aspect-square rounded-2xl overflow-hidden bg-[#1A1A1A] border-2 border-dashed border-white/10 hover:border-blue-500/50 transition-colors flex flex-col items-center justify-center"
                 >
-                  <span class="text-sm font-bold text-gray-300 flex-1">Status Verifikasi</span
-                  ><input
-                    type="checkbox"
-                    v-model="formData.is_verified"
-                    class="checkbox checkbox-info checkbox-sm"
+                  <img
+                    v-if="formData.avatar_url"
+                    :src="formData.avatar_url"
+                    class="w-full h-full object-cover"
                   />
-                </label>
-              </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-              <div class="flex flex-col gap-2">
-                <label class="text-[11px] font-bold text-gray-400 flex items-center gap-1"
-                  ><Instagram class="w-3 h-3" /> Link Instagram</label
-                ><input
-                  v-model="formData.instagram_url"
-                  type="url"
-                  class="input input-sm bg-[#121212] border-white/10 text-white"
+                  <div v-else class="flex flex-col items-center text-gray-500">
+                    <ImageIcon class="w-8 h-8 mb-2" />
+                    <span class="text-xs">Upload Foto</span>
+                  </div>
+
+                  <!-- Overlay for upload -->
+                  <div
+                    class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                  >
+                    <label class="btn btn-sm btn-primary">
+                      <Upload class="w-4 h-4 mr-2" /> Ganti
+                      <input
+                        type="file"
+                        accept="image/*"
+                        class="hidden"
+                        @change="handleFileUpload"
+                      />
+                    </label>
+                  </div>
+                  <div
+                    v-if="isUploading"
+                    class="absolute inset-0 bg-black/80 flex items-center justify-center z-20"
+                  >
+                    <span class="loading loading-spinner text-blue-500"></span>
+                  </div>
+                </div>
+                <input
+                  v-model="formData.avatar_url"
+                  type="text"
+                  placeholder="atau paste URL..."
+                  class="input input-sm bg-[#1A1A1A] border-white/10 text-white w-full text-xs"
                 />
               </div>
-              <div class="flex flex-col gap-2">
-                <label class="text-[11px] font-bold text-gray-400 flex items-center gap-1"
-                  ><Youtube class="w-3 h-3" /> Link YouTube</label
-                ><input
-                  v-model="formData.youtube_channel"
-                  type="url"
-                  class="input input-sm bg-[#121212] border-white/10 text-white"
-                />
-              </div>
-              <div class="flex flex-col gap-2">
-                <label class="text-[11px] font-bold text-gray-400 flex items-center gap-1"
-                  >Link TikTok</label
-                ><input
-                  v-model="formData.tiktok_url"
-                  type="url"
-                  class="input input-sm bg-[#121212] border-white/10 text-white"
-                />
+
+              <!-- Right Column: Details -->
+              <div class="md:col-span-8 flex flex-col gap-5">
+                <!-- Nama -->
+                <div class="flex flex-col gap-2">
+                  <label class="text-sm font-bold text-gray-400">Nama Lengkap / Gelar *</label>
+                  <input
+                    v-model="formData.name"
+                    type="text"
+                    class="input bg-[#1A1A1A] border-white/10 text-white focus:border-blue-500"
+                    placeholder="Ustadz..."
+                    required
+                  />
+                </div>
+
+                <!-- Bio -->
+                <div class="flex flex-col gap-2">
+                  <label class="text-sm font-bold text-gray-400">Bio Singkat</label>
+                  <textarea
+                    v-model="formData.bio"
+                    class="textarea bg-[#1A1A1A] border-white/10 text-white focus:border-blue-500 h-24"
+                    placeholder="Deskripsi singkat profil..."
+                  ></textarea>
+                </div>
+
+                <!-- Verification -->
+                <div class="flex flex-col gap-2">
+                  <label class="text-sm font-bold text-gray-400">Status Verifikasi</label>
+                  <div
+                    class="flex items-center gap-3 bg-[#1A1A1A] p-3 rounded-lg border border-white/10"
+                  >
+                    <input
+                      type="checkbox"
+                      v-model="formData.is_verified"
+                      class="toggle toggle-success toggle-sm"
+                    />
+                    <span class="text-sm text-gray-300 flex items-center gap-2">
+                      <BadgeCheck v-if="formData.is_verified" class="w-4 h-4 text-blue-500" />
+                      {{
+                        formData.is_verified
+                          ? 'Akun Terverifikasi (Centang Biru)'
+                          : 'Belum Terverifikasi'
+                      }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Social Media -->
+                <div class="flex flex-col gap-3">
+                  <label class="text-sm font-bold text-gray-400">Social Media</label>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Instagram -->
+                    <div class="flex flex-col gap-2">
+                      <label class="text-xs text-gray-500 flex items-center gap-1"
+                        ><Instagram class="w-3 h-3" /> Instagram</label
+                      >
+                      <input
+                        v-model="formData.instagram_url"
+                        type="url"
+                        class="input input-sm bg-[#1A1A1A] border-white/10 text-white"
+                        placeholder="https://instagram.com/..."
+                      />
+                    </div>
+                    <!-- Youtube -->
+                    <div class="flex flex-col gap-2">
+                      <label class="text-xs text-gray-500 flex items-center gap-1"
+                        ><Youtube class="w-3 h-3" /> YouTube</label
+                      >
+                      <input
+                        v-model="formData.youtube_channel"
+                        type="url"
+                        class="input input-sm bg-[#1A1A1A] border-white/10 text-white"
+                        placeholder="https://youtube.com/..."
+                      />
+                    </div>
+                    <!-- TikTok -->
+                    <div class="flex flex-col gap-2">
+                      <label class="text-xs text-gray-500 flex items-center gap-1"
+                        ><span class="font-bold text-[10px]">TT</span> TikTok</label
+                      >
+                      <input
+                        v-model="formData.tiktok_url"
+                        type="url"
+                        class="input input-sm bg-[#1A1A1A] border-white/10 text-white"
+                        placeholder="https://tiktok.com/..."
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="flex flex-col gap-4">
-            <div class="flex justify-between items-center border-b border-white/10 pb-2">
-              <h4 class="text-blue-400 font-bold flex items-center gap-2">
-                <Share2 class="w-4 h-4" /> 2. Akun Clipper / Fanbase
-              </h4>
+          <!-- 2. Fanbase -->
+          <div class="space-y-4">
+            <div class="flex justify-between items-end pb-2 border-b border-white/5">
+              <div class="flex items-center gap-3">
+                <div class="p-2 rounded-lg bg-purple-500/10 text-purple-500">
+                  <Share2 class="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 class="text-lg font-bold text-white">Akun Clipper / Fanbase</h4>
+                  <p class="text-xs text-gray-500">Akun sosial media yang me-repost konten.</p>
+                </div>
+              </div>
             </div>
+
             <div
-              v-for="(f, idx) in fanbaseForms"
-              :key="'fb' + idx"
-              class="bg-[#1A1A1A] p-4 rounded-xl border border-white/10 relative"
+              v-if="fanbaseForms.length === 0"
+              class="text-center py-8 border border-dashed border-white/10 rounded-xl bg-[#1A1A1A]/50"
             >
-              <button
-                @click.prevent="removeFanbase(idx)"
-                class="absolute -top-3 -right-3 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 shadow-lg"
+              <p class="text-sm text-gray-500">Belum ada data fanbase.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div
+                v-for="(f, idx) in fanbaseForms"
+                :key="idx"
+                class="bg-[#1A1A1A] p-4 rounded-xl border border-white/5 hover:border-purple-500/30 transition-colors"
               >
-                <XCircle class="w-4 h-4" />
-              </button>
-              <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                <div class="flex flex-col gap-1 md:col-span-4">
-                  <label class="text-xs font-bold text-gray-400">Nama Akun *</label
-                  ><input
-                    v-model="f.nama_akun"
-                    type="text"
-                    class="input input-sm bg-[#121212] border-white/10 text-white focus:border-blue-500"
-                    required
-                  />
-                </div>
-                <div class="flex flex-col gap-1 md:col-span-3">
-                  <label class="text-xs font-bold text-gray-400">Platform</label
-                  ><select
-                    v-model="f.platform"
-                    class="select select-sm bg-[#121212] border-white/10 text-white focus:border-blue-500"
+                <div class="flex justify-between items-center mb-3 border-b border-white/5 pb-2">
+                  <span class="text-sm font-bold text-white">#{{ idx + 1 }} Akun Fanbase</span>
+                  <button
+                    @click.prevent="removeFanbase(idx)"
+                    class="text-gray-600 hover:text-red-500 transition-colors"
                   >
-                    <option value="instagram">Instagram</option>
-                    <option value="youtube">YouTube</option>
-                    <option value="tiktok">TikTok</option>
-                  </select>
+                    <Trash2 class="w-4 h-4" />
+                  </button>
                 </div>
-                <div class="flex flex-col gap-1 md:col-span-5">
-                  <label class="text-xs font-bold text-gray-400">URL Akun *</label
-                  ><input
-                    v-model="f.url_akun"
-                    type="url"
-                    class="input input-sm bg-[#121212] border-white/10 text-white focus:border-blue-500"
-                    required
-                  />
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="flex flex-col gap-2">
+                    <label class="text-xs text-gray-500">Nama Akun</label>
+                    <input
+                      v-model="f.nama_akun"
+                      type="text"
+                      class="input input-sm w-full bg-[#121212] border-white/10 text-white focus:border-purple-500"
+                      placeholder="@akun..."
+                    />
+                  </div>
+                  <div class="flex flex-col gap-2">
+                    <label class="text-xs text-gray-500">Platform</label>
+                    <select
+                      v-model="f.platform"
+                      class="select select-sm w-full bg-[#121212] border-white/10 text-white focus:border-purple-500"
+                    >
+                      <option value="instagram">Instagram</option>
+                      <option value="youtube">YouTube</option>
+                      <option value="tiktok">TikTok</option>
+                    </select>
+                  </div>
+                  <div class="flex flex-col gap-2 md:col-span-2">
+                    <label class="text-xs text-gray-500">URL Profil</label>
+                    <input
+                      v-model="f.url_akun"
+                      type="url"
+                      class="input input-sm w-full bg-[#121212] border-white/10 text-white focus:border-purple-500"
+                      placeholder="https://..."
+                    />
+                  </div>
                 </div>
               </div>
             </div>
             <button
               type="button"
               @click="addFanbase"
-              class="btn btn-sm btn-outline border-blue-500/50 text-blue-400 hover:bg-blue-500 hover:text-white mt-2 w-fit self-center"
+              class="btn btn-sm btn-outline border-purple-500/50 text-purple-400 hover:bg-purple-500 hover:text-white gap-2 w-full border-dashed"
             >
               <PlusCircle class="w-4 h-4" /> Tambah Akun Clipper
             </button>
           </div>
 
-          <div class="flex flex-col gap-4">
-            <div class="flex justify-between items-center border-b border-white/10 pb-2">
-              <h4 class="text-blue-400 font-bold flex items-center gap-2">
-                <Building2 class="w-4 h-4" /> 3. Otoritas Keilmuan (Jalur Sanad)
-              </h4>
-            </div>
-            <div
-              v-for="(s, sIdx) in sanadForms"
-              :key="'snd' + sIdx"
-              class="bg-[#151515] p-5 rounded-xl border border-blue-500/30 relative shadow-inner"
-            >
-              <button
-                @click.prevent="removeSanad(sIdx)"
-                class="absolute -top-3 -right-3 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 shadow-lg"
-              >
-                <XCircle class="w-4 h-4" />
-              </button>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div class="flex flex-col gap-1">
-                  <label class="text-xs font-bold text-gray-400">Instansi / Pondok *</label
-                  ><input
-                    v-model="s.nama_instansi_guru"
-                    type="text"
-                    class="input input-sm bg-[#1A1A1A] border-white/10 text-white focus:border-blue-500"
-                    required
-                  />
+          <!-- 3. Sanad -->
+          <div class="space-y-4">
+            <div class="flex justify-between items-end pb-2 border-b border-white/5">
+              <div class="flex items-center gap-3">
+                <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-500">
+                  <Building2 class="w-5 h-5" />
                 </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-xs font-bold text-gray-400">Kategori Instansi</label
-                  ><select
-                    v-model="s.kategori"
-                    class="select select-sm bg-[#1A1A1A] border-white/10 text-white focus:border-blue-500"
-                  >
-                    <option value="Pesantren">Pesantren</option>
-                    <option value="Universitas">Universitas</option>
-                    <option value="Talaqqi">Talaqqi / Majelis</option>
-                    <option value="Keluarga">Keluarga / Nasab</option>
-                  </select>
-                </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-xs font-bold text-gray-400">Periode (cth: 2010-2015)</label
-                  ><input
-                    v-model="s.periode"
-                    type="text"
-                    class="input input-sm bg-[#1A1A1A] border-white/10 text-white focus:border-blue-500"
-                  />
-                </div>
-                <div class="flex flex-col gap-1">
-                  <label class="text-xs font-bold text-gray-400">Website Instansi (Tabayyun)</label
-                  ><input
-                    v-model="s.website_url"
-                    type="url"
-                    class="input input-sm bg-[#1A1A1A] border-white/10 text-white focus:border-blue-500"
-                  />
+                <div>
+                  <h4 class="text-lg font-bold text-white">Jalur Sanad Keilmuan</h4>
+                  <p class="text-xs text-gray-500">Riwayat pendidikan dan guru-guru.</p>
                 </div>
               </div>
-              <div class="bg-[#1A1A1A] p-4 rounded-lg border border-white/5">
-                <span
-                  class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-3 block"
-                  >Daftar Guru / Kiai di Instansi Ini:</span
-                >
-                <div
-                  v-for="(g, gIdx) in s.gurus"
-                  :key="'guru' + sIdx + gIdx"
-                  class="flex items-end gap-2 mb-2"
-                >
-                  <div class="flex-1 flex flex-col gap-1">
-                    <input
-                      v-model="g.nama_guru"
-                      type="text"
-                      placeholder="Nama Guru *"
-                      class="input input-xs bg-[#121212] border-white/10 text-white"
-                      required
-                    />
-                  </div>
-                  <div class="flex-1 flex flex-col gap-1">
-                    <input
-                      v-model="g.spesialisasi_kitab"
-                      type="text"
-                      placeholder="Spesialisasi Kitab/Ilmu"
-                      class="input input-xs bg-[#121212] border-white/10 text-white"
-                    />
+            </div>
+
+            <div
+              v-if="sanadForms.length === 0"
+              class="text-center py-8 border border-dashed border-white/10 rounded-xl bg-[#1A1A1A]/50"
+            >
+              <p class="text-sm text-gray-500">Belum ada data sanad.</p>
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <div
+                v-for="(s, sIdx) in sanadForms"
+                :key="sIdx"
+                class="bg-[#1A1A1A] rounded-xl border border-white/5 overflow-hidden"
+              >
+                <!-- Header Sanad Item -->
+                <div class="bg-[#222] p-4 flex justify-between items-start border-b border-white/5">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full pr-8">
+                    <div>
+                      <label class="text-[10px] uppercase font-bold text-gray-500 mb-1 block"
+                        >Instansi / Pondok</label
+                      >
+                      <input
+                        v-model="s.nama_instansi_guru"
+                        type="text"
+                        class="input input-sm w-full bg-[#121212] border-white/10 text-white focus:border-emerald-500 font-bold"
+                        placeholder="Nama Instansi..."
+                      />
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                      <div>
+                        <label class="text-[10px] uppercase font-bold text-gray-500 mb-1 block"
+                          >Kategori</label
+                        >
+                        <select
+                          v-model="s.kategori"
+                          class="select select-sm w-full bg-[#121212] border-white/10 text-white focus:border-emerald-500"
+                        >
+                          <option value="Pesantren">Pesantren</option>
+                          <option value="Universitas">Universitas</option>
+                          <option value="Talaqqi">Talaqqi</option>
+                          <option value="Keluarga">Nasab</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="text-[10px] uppercase font-bold text-gray-500 mb-1 block"
+                          >Periode</label
+                        >
+                        <input
+                          v-model="s.periode"
+                          type="text"
+                          class="input input-sm w-full bg-[#121212] border-white/10 text-white focus:border-emerald-500"
+                          placeholder="Thn..."
+                        />
+                      </div>
+                    </div>
                   </div>
                   <button
-                    @click.prevent="removeGuru(sIdx, gIdx)"
-                    class="btn btn-xs btn-square btn-error text-white"
+                    @click.prevent="removeSanad(sIdx)"
+                    class="text-gray-600 hover:text-red-500 transition-colors"
                   >
-                    <Trash2 class="w-3 h-3" />
+                    <Trash2 class="w-4 h-4" />
                   </button>
                 </div>
-                <button
-                  type="button"
-                  @click="addGuru(sIdx)"
-                  class="btn btn-xs bg-green-500/20 text-green-500 hover:bg-green-500 hover:text-white border-0 mt-2"
-                >
-                  <Plus class="w-3 h-3" /> Tambah Guru Baru
-                </button>
+
+                <!-- Body Sanad Item (Gurus) -->
+                <div class="p-4 bg-[#1A1A1A]">
+                  <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wider"
+                      >Daftar Guru</span
+                    >
+                  </div>
+
+                  <div class="space-y-2">
+                    <div
+                      v-for="(g, gIdx) in s.gurus"
+                      :key="gIdx"
+                      class="flex items-center gap-2 group/guru"
+                    >
+                      <div
+                        class="w-6 h-6 rounded-full bg-[#121212] flex items-center justify-center text-gray-600 text-[10px] font-bold border border-white/5"
+                      >
+                        {{ gIdx + 1 }}
+                      </div>
+                      <input
+                        v-model="g.nama_guru"
+                        type="text"
+                        class="input input-xs flex-1 bg-[#121212] border-white/10 text-white focus:border-emerald-500"
+                        placeholder="Nama Guru..."
+                      />
+                      <input
+                        v-model="g.spesialisasi_kitab"
+                        type="text"
+                        class="input input-xs flex-1 bg-[#121212] border-white/10 text-gray-400 focus:border-emerald-500"
+                        placeholder="Spesialisasi / Kitab..."
+                      />
+                      <button
+                        @click.prevent="removeGuru(sIdx, gIdx)"
+                        class="opacity-0 group-hover/guru:opacity-100 text-gray-600 hover:text-red-500 transition-all"
+                      >
+                        <XCircle class="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div
+                      v-if="s.gurus.length === 0"
+                      class="text-center py-2 text-xs text-gray-600 italic"
+                    >
+                      Belum ada guru yang ditambahkan.
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    @click="addGuru(sIdx)"
+                    class="btn btn-xs btn-ghost text-emerald-500 hover:bg-emerald-500/10 w-full mt-3 border border-dashed border-emerald-500/30"
+                  >
+                    <Plus class="w-3 h-3" /> Tambah Guru
+                  </button>
+
+                  <div class="mt-4 pt-3 border-t border-white/5">
+                    <input
+                      v-model="s.website_url"
+                      type="url"
+                      class="input input-xs w-full bg-transparent border-none text-gray-500 focus:text-white placeholder-gray-700"
+                      placeholder="Tambahkan URL Website Instansi untuk referensi (Opsional)..."
+                    />
+                  </div>
+                </div>
               </div>
             </div>
             <button
               type="button"
               @click="addSanad"
-              class="btn btn-sm bg-[#2962FF]/20 text-[#2962FF] hover:bg-[#2962FF] hover:text-white border-0 mt-2 w-full"
+              class="btn btn-sm btn-outline border-emerald-500/50 text-emerald-400 hover:bg-emerald-500 hover:text-white gap-2 w-full border-dashed"
             >
-              <PlusCircle class="w-4 h-4" /> Tambah Jalur Sanad Baru
+              <PlusCircle class="w-4 h-4" /> Tambah Jalur Sanad
             </button>
           </div>
           <button type="submit" class="hidden"></button>
@@ -687,6 +846,14 @@ onMounted(fetchDais)
       </div>
       <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
+
+    <button
+      @click="openModal()"
+      class="fixed bottom-10 right-10 btn btn-lg bg-[#2962FF] hover:bg-blue-700 text-white border-0 shadow-[0_0_30px_rgba(41,98,255,0.5)] z-50 transition-transform hover:scale-105 rounded-full px-8 gap-2"
+      title="Tambah Da'i Baru"
+    >
+      <Plus class="w-6 h-6" /> Tambah Da'i
+    </button>
   </div>
 </template>
 

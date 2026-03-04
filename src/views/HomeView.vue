@@ -15,6 +15,8 @@ import {
   ExternalLink,
   ImageIcon,
   Plus,
+  Search,
+  Upload,
 } from 'lucide-vue-next'
 // Import SweetAlert & Logger
 import { showSuccess, showError, confirmAction } from '../utils/alert'
@@ -23,8 +25,10 @@ import { logActivity } from '../utils/logger'
 const kajians = ref([])
 const daisList = ref([]) // Menyimpan list nama Da'i untuk dropdown
 const isLoading = ref(true)
+const searchQuery = ref('')
 const isStatsLoading = ref(true)
 const isSaving = ref(false)
+const isUploading = ref(false)
 
 const filterStatus = ref('all')
 
@@ -106,9 +110,19 @@ const fetchKajians = async () => {
 }
 
 const filteredKajians = computed(() => {
-  if (filterStatus.value === 'all') return kajians.value
-  return kajians.value.filter(
-    (k) => (k.status || '').toLowerCase() === filterStatus.value.toLowerCase(),
+  let result = kajians.value
+  if (filterStatus.value !== 'all') {
+    result = result.filter(
+      (k) => (k.status || '').toLowerCase() === filterStatus.value.toLowerCase(),
+    )
+  }
+  if (!searchQuery.value) return result
+
+  const query = searchQuery.value.toLowerCase()
+  return result.filter(
+    (k) =>
+      (k.title || '').toLowerCase().includes(query) ||
+      (k.dai_name || '').toLowerCase().includes(query),
   )
 })
 
@@ -171,6 +185,29 @@ const openModal = (kajian = null) => {
 }
 
 const closeModal = () => document.getElementById('modal_kajian').close()
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  isUploading.value = true
+  try {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `thumb-${Date.now()}.${fileExt}`
+    const filePath = `thumbnails/${fileName}`
+
+    const { error: uploadError } = await supabase.storage.from('images').upload(filePath, file)
+    if (uploadError) throw uploadError
+
+    const { data } = supabase.storage.from('images').getPublicUrl(filePath)
+    editFormData.value.thumbnail_url = data.publicUrl
+    showSuccess('Upload Berhasil', 'Thumbnail berhasil diunggah')
+  } catch (error) {
+    showError('Gagal Upload', error.message)
+  } finally {
+    isUploading.value = false
+  }
+}
 
 const saveKajian = async () => {
   isSaving.value = true
@@ -316,70 +353,75 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
-      <div>
-        <h2 class="text-2xl font-bold text-white mb-1 flex items-center gap-2">
-          <Activity class="w-6 h-6 text-[#2962FF]" /> Studio Redaksi
-        </h2>
-        <p class="text-gray-400 text-sm">Manajemen konten video layaknya profesional.</p>
-      </div>
-      <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto items-start sm:items-end">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
+      <div class="flex items-center gap-4 w-full md:w-auto">
         <div
-          class="flex gap-2 bg-[#121212] p-1.5 rounded-xl border border-white/5 overflow-x-auto max-w-full"
+          class="w-14 h-14 rounded-2xl bg-[#2962FF]/10 flex items-center justify-center text-[#2962FF] shrink-0"
         >
-          <button
-            @click="setFilter('all')"
-            :class="
-              filterStatus === 'all'
-                ? 'bg-[#2962FF] text-white'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            "
-            class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap"
-          >
-            Semua Data
-          </button>
-          <button
-            @click="setFilter('pending')"
-            :class="
-              filterStatus === 'pending'
-                ? 'bg-warning text-warning-content'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            "
-            class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap flex items-center gap-2"
-          >
-            <div v-if="filterStatus !== 'pending'" class="w-2 h-2 rounded-full bg-warning"></div>
-            Pending
-          </button>
-          <button
-            @click="setFilter('approved')"
-            :class="
-              filterStatus === 'approved'
-                ? 'bg-success text-success-content'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            "
-            class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap"
-          >
-            Telah Tayang
-          </button>
-          <button
-            @click="setFilter('rejected')"
-            :class="
-              filterStatus === 'rejected'
-                ? 'bg-error text-white'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
-            "
-            class="px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap"
-          >
-            Ditolak
-          </button>
+          <Activity class="w-7 h-7" />
         </div>
-        <button
-          @click="openModal()"
-          class="btn bg-[#2962FF] hover:bg-blue-700 text-white border-0 shadow-lg shadow-blue-500/20 shrink-0"
-        >
-          <Plus class="w-5 h-5" /> Tambah Kajian
-        </button>
+        <div>
+          <h2 class="text-2xl font-bold text-white">Studio Redaksi</h2>
+          <p class="text-gray-400 text-sm">Manajemen konten video layaknya profesional.</p>
+        </div>
       </div>
+
+      <div class="relative w-full md:w-72">
+        <Search class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Cari judul atau da'i..."
+          class="input bg-[#121212] border border-white/10 text-white w-full pl-11 focus:border-[#2962FF] focus:outline-none rounded-full h-12 shadow-inner"
+        />
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-3 mb-8">
+      <button
+        @click="setFilter('all')"
+        :class="
+          filterStatus === 'all'
+            ? 'bg-[#2962FF] text-white border-[#2962FF]'
+            : 'bg-[#1A1A1A] text-gray-400 border-white/10 hover:border-white/30 hover:text-white'
+        "
+        class="btn btn-sm rounded-full border px-6 font-medium capitalize"
+      >
+        Semua Data
+      </button>
+      <button
+        @click="setFilter('pending')"
+        :class="
+          filterStatus === 'pending'
+            ? 'bg-warning text-warning-content border-warning'
+            : 'bg-[#1A1A1A] text-gray-400 border-white/10 hover:border-warning/50 hover:text-warning'
+        "
+        class="btn btn-sm rounded-full border px-6 font-medium capitalize"
+      >
+        Pending Review
+      </button>
+      <button
+        @click="setFilter('approved')"
+        :class="
+          filterStatus === 'approved'
+            ? 'bg-success text-success-content border-success'
+            : 'bg-[#1A1A1A] text-gray-400 border-white/10 hover:border-success/50 hover:text-success'
+        "
+        class="btn btn-sm rounded-full border px-6 font-medium capitalize"
+      >
+        Telah Tayang
+      </button>
+      <button
+        @click="setFilter('rejected')"
+        :class="
+          filterStatus === 'rejected'
+            ? 'bg-error text-white border-error'
+            : 'bg-[#1A1A1A] text-gray-400 border-white/10 hover:border-error/50 hover:text-error'
+        "
+        class="btn btn-sm rounded-full border px-6 font-medium capitalize"
+      >
+        Ditolak
+      </button>
     </div>
 
     <div v-if="isLoading" class="flex justify-center p-20">
@@ -620,13 +662,22 @@ onMounted(() => {
             </div>
 
             <div class="flex flex-col gap-2">
-              <label class="text-sm font-bold text-gray-300">URL Thumbnail Gambar</label
-              ><input
-                v-model="editFormData.thumbnail_url"
-                type="url"
-                class="input input-bordered bg-[#121212] border-white/10 text-gray-400 w-full focus:border-[#2962FF] focus:outline-none focus:text-white"
-                placeholder="https://..."
-              />
+              <label class="text-sm font-bold text-gray-300">Thumbnail Gambar</label>
+              <div class="flex gap-2">
+                <input
+                  v-model="editFormData.thumbnail_url"
+                  type="text"
+                  class="input input-bordered bg-[#121212] border-white/10 text-gray-400 flex-1 focus:border-[#2962FF] focus:outline-none focus:text-white"
+                  placeholder="URL atau Upload..."
+                />
+                <label
+                  class="btn btn-square btn-outline border-white/10 hover:bg-white/5 hover:border-white/20 relative"
+                >
+                  <input type="file" accept="image/*" class="hidden" @change="handleFileUpload" />
+                  <span v-if="isUploading" class="loading loading-spinner loading-xs"></span>
+                  <Upload v-else class="w-5 h-5 text-gray-400" />
+                </label>
+              </div>
             </div>
             <div class="flex flex-col gap-2">
               <label class="text-sm font-bold text-gray-300">URL Video Sumber (YouTube dll)</label
@@ -686,6 +737,14 @@ onMounted(() => {
       </div>
       <form method="dialog" class="modal-backdrop"><button>close</button></form>
     </dialog>
+
+    <button
+      @click="openModal()"
+      class="fixed bottom-10 right-10 btn btn-lg bg-[#2962FF] hover:bg-blue-700 text-white border-0 shadow-[0_0_30px_rgba(41,98,255,0.5)] z-50 transition-transform hover:scale-105 rounded-full px-8 gap-2"
+      title="Tambah Kajian Baru"
+    >
+      <Plus class="w-6 h-6" /> Tambah Konten
+    </button>
   </div>
 </template>
 
